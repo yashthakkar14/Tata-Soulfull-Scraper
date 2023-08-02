@@ -65,16 +65,12 @@ class FoodScraperSpider(scrapy.Spider):
         # Extracting gram_heading
         gram_heading = Selector(text=table_headings).xpath("//th").extract()[1]
         gram_heading_list = Selector(text=gram_heading).xpath("//text()").extract()
-        gram_value = ""
-        for gram_heading_value in gram_heading_list:
-            gram_heading_value = gram_heading_value.replace("\xa0", "")
-            gram_value += gram_heading_value
+        gram_value = self.clean_nutrition(gram_heading_list)
         
         # Extracting RDA heading
         rda_heading = Selector(text=table_headings).xpath("//th").extract()[2]
         rda_heading_list = Selector(text=rda_heading).xpath("//text()").extract()
-        if rda_heading_list and rda_heading_list[0]:
-            rda_value = rda_heading_list[0]
+        rda_value = self.clean_nutrition(rda_heading_list)
 
         table_values = response.xpath('//table[@class="nutritionTable"]/tbody/tr').extract()
         for table_value in table_values:
@@ -84,22 +80,24 @@ class FoodScraperSpider(scrapy.Spider):
                 table_value_heading = table_value_elements[0]
                 table_value_list = Selector(text=table_value_heading).xpath("//text()").extract()
                 table_heading_value = self.clean_nutrition(table_value_list)
-    
+                if table_heading_value:
+                    table_heading_value = table_heading_value.strip()
+
                 table_value_gram = table_value_elements[1]
                 table_value_gram = Selector(text=table_value_gram).xpath("//text()").extract()
                 if table_value_gram and table_value_gram[0]:
                     table_value_gram = float(table_value_gram[0])
-    
+
                 table_rda_value = None
                 table_value_rda = table_value_elements[2]
                 table_value_rda = Selector(text=table_value_rda).xpath("//text()").extract()
                 if table_value_rda and table_value_rda[0]:
                     table_rda_value = float(table_value_rda[0])
-                
+
                 nutrition_dict['nutrition_type'] = table_heading_value
                 nutrition_dict[gram_value] = table_value_gram
                 nutrition_dict[rda_value] = table_rda_value
-    
+
                 nutrition_list.append(nutrition_dict)
         
         item = {
@@ -111,7 +109,8 @@ class FoodScraperSpider(scrapy.Spider):
             'brand' : brand,
             'ingredients' : ingredients,
             'price' : price,
-            'nutrition' : nutrition_list
+            'nutrition' : nutrition_list,
+            'url' : response.url
         }
             
         mon_con = MongoClient('localhost', 27017)
